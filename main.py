@@ -8,7 +8,25 @@ import time
 client = discord.Client()
 
 
+def check_group_member(user):
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
 
+    for i in groupdata.keys():
+        if user.id in groupdata[i]["members"]:
+            return True, groupdata[i]
+        
+    return False, None
+
+def check_group_owner(user):
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    for i in groupdata.keys()
+        if user.id == groupdata[i]["owner"]:
+            return True, groupdata[i]
+        
+    return False, None
 
 def register_user(user):
     with open("playerdata.json", "r") as file:
@@ -379,6 +397,19 @@ async def create_group(user, message) -> None:
 
         if userdata[str(user.id)]["data"]["Money"] < 250:
             await message.channel.send("```You dont have enough Retard Bucks to create a group.```")
+            return
+
+        does_own_group, tempvar1 = does_own_group(user)
+
+        if does_own_group:
+            await message.channel.send("```You already own a group.```")
+            return
+
+        is_in_group, tempvar2 = is_in_group(user)
+
+        if is_in_group:
+            await message.channel.send("```You are already in a group.```")
+            return
 
         if factionname in groupdata.keys():
             await message.channel.send("```That groupname is already being used.```")
@@ -394,7 +425,69 @@ async def create_group(user, message) -> None:
         except asyncio.TimeoutError:
             await message.channel.send(f"```Cancelled group creation.```")
             return
-        
+
+        #actual creation
+        groupdata[factionname]["owner"] = user
+        groupdata[factionname]["members"] = {}
+        groupdata[factionname]["money"] = 0
+        groupdata[factionname]["inventory"] = {}
+
+        with open("groupdata.json", "w") as file:
+            json.dump(groupdata, file)
+
+        await message.channel.send(f"````Faction {factionname} has been created.```")
+
+async def invite_group(user, message) -> None:
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+
+    split_message = message.content.split( )
+    if len(message.mentions) > 1:
+        await message.channel.send(f"```{user.display_name}, you cannot invite more than 1 person!```")
+        return
+    elif len(message.mentions) < 1: 
+        await message.channel.send(f"```{user.display_name}, you need to tag someone to invite!```")
+        return
+
+    target = message.mentions[0]
+
+    isingroup, tempvar3 = is_in_group(target)
+
+    if isingroup:
+        await message.channel.send(f"```He is already in a group, bruh.```")
+        return
+
+    doesownagroup, tempvar4 = does_own_group(target)
+
+    if doesownagroup:
+        await message.channel.send(f"```He owns a group, bruh.```")
+        return
+
+    doesowngroupuser, group_bruh = doesownagroup(user)
+
+    if not doesownagroupuser:
+        await message.channel.send(f"```You need to own a group to add them.```")
+
+
+    await message.channel.send(f"```{target.display_name}, please do --accept to accept the invite.```")
+
+    def check4(msg):
+        return msg.content == "--accept" and msg.author == target
+
+    try:
+        msg = await client.wait_for('message', timeout=30.0, check=check4)
+    except asyncio.TimeoutError:
+        await message.channel.send(f"```{target.display_name} did not accept the request in time. RIP...```")
+        return
+
+    groupdata[group_bruh]["members"][target.id] = "Member"
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+    
+    await message.channel.send(f"```{target.display_name} has been added to {group_bruh}.```")
+    return
 
 #region Command handler
 @client.event
@@ -441,9 +534,11 @@ async def on_message(message):
             await fight(message.author, message)
         elif message.content.startswith("?creategroup"):
             await create_group(message.author, message)
+        elif message.content.startswith("?invitegroup"):
+            await invite_group(message.author, message)
         else:
             await message.channel.send(f"```Thats not an option, please use ?help```")
 
 #endregion
 
-client.run("NzA0OTc1NjQ4NDgwODIxMjQ5.XqqbNA.JiXQ8Lfb8uXNA94cgYBit0DYAss")
+client.run("YOUR TOKEN HERE")
