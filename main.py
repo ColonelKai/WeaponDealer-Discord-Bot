@@ -42,7 +42,7 @@ def register_user(user):
 def balance_read(user):
     with open("playerdata.json", "r") as file:
         userdata = json.load(file)
-    return f"You have {userdata[str(user.id)]['data']['Money']} Retard Bucks.\nYou have {userdata[str(user.id)]['data']['health']} health"    
+    return f"You have {userdata[str(user.id)]['data']['Money']} Retard Bucks.\nYou have {userdata[str(user.id)]['data']['health']} health\nYou have {userdata[str(user.id)]['data']['RP']} Respect Points."    
 
 def money_set(user, message):
     if message.channel.permissions_for(user).administrator:
@@ -192,12 +192,17 @@ def use_item(user, message):
         return "You dont have that item, retard."
     
     if item == "bread":
+
         if userdata[str(user.id)]["data"]["health"] == 100:
             return "You already have full health."
         elif userdata[str(user.id)]["data"]["health"] > 94:
             userdata[str(user.id)]["data"]["health"] = 100
         else:
             userdata[str(user.id)]["data"]["health"] += 5
+        if userdata[str(user.id)]["data"]["inventory"][item] == 1:
+            del userdata[str(user.id)]["data"]["inventory"][item]
+        else:
+            userdata[str(user.id)]["data"]["inventory"][item] -= 1
         with open("playerdata.json", "w") as file:
             json.dump(userdata, file)
         return "You ate a bread and gained 5 health!"
@@ -209,6 +214,10 @@ def use_item(user, message):
             userdata[str(user.id)]["data"]["health"] = 200
         else:
             userdata[str(user.id)]["data"]["health"] += 20
+        if userdata[str(user.id)]["data"]["inventory"][item] == 1:
+            del userdata[str(user.id)]["data"]["inventory"][item]
+        else:
+            userdata[str(user.id)]["data"]["inventory"][item] -= 1
         with open("playerdata.json", "w") as file:
             json.dump(userdata, file)
         return "You ate a bread and gained 5 health!"
@@ -247,10 +256,10 @@ async def fight(user, message) -> None:
 
     print(target.id)
 
-    await message.channel.send(f"```{target.display_name}, please do ?accept to accept the fight, otherwise you are a certified pussy.```")
+    await message.channel.send(f"```{target.display_name}, please do --accept to accept the fight, otherwise you are a certified pussy.```")
 
     def check1(msg):
-        return msg.content == "?accept" and msg.author == target
+        return msg.content == "--accept" and msg.author == target
 
     try:
         msg = await client.wait_for('message', timeout=30.0, check=check1)
@@ -327,10 +336,12 @@ async def fight(user, message) -> None:
             
             damage = gundata[split_message[1]]
 
+            print(damage)
+
             max_randomizer = damage / 4
             min_randomizer = max_randomizer * -1
 
-            bruh = random.randint(min_randomizer, max_randomizer)
+            bruh = random.randint(int(min_randomizer), int(max_randomizer))
 
             damage += bruh
 
@@ -351,8 +362,39 @@ async def fight(user, message) -> None:
 
             continue
 
+async def create_group(user, message) -> None:
+        with open("groupdata.json", "w") as file:
+            groupdata = json.load(file)
 
+        with open("userdata.json", "w") as file:
+            userdata = json.load(file)
 
+        split_message = message.content.split( )
+
+        if len(split_message) < 2:
+            await message.channel.send("```You need to enter a name to create a group.```")  
+            return
+        
+        factionname = split_message[1]
+
+        if userdata[str(user.id)]["data"]["Money"] < 250:
+            await message.channel.send("```You dont have enough Retard Bucks to create a group.```")
+
+        if factionname in groupdata.keys():
+            await message.channel.send("```That groupname is already being used.```")
+            return
+
+        await message.channel.send(f"```{user.display_name}, this is going to cost 250 Retard Bucks, are you sure? (do --accept to accept and do nothing to deny)```")
+
+        def check3(msg):
+            return msg.content == "--accept" and msg.author == user
+        
+        try:
+            msg = await client.wait_for('message', timeout=30.0, check=check3)
+        except asyncio.TimeoutError:
+            await message.channel.send(f"```Cancelled group creation.```")
+            return
+        
 
 #region Command handler
 @client.event
@@ -397,11 +439,11 @@ async def on_message(message):
             await message.channel.send(f"```{rv}```")
         elif message.content.startswith("?fight"):
             await fight(message.author, message)
-        elif message.content.startswith("?accept"):
-            pass
+        elif message.content.startswith("?creategroup"):
+            await create_group(message.author, message)
         else:
             await message.channel.send(f"```Thats not an option, please use ?help```")
 
 #endregion
 
-client.run("NzA0OTc1NjQ4NDgwODIxMjQ5.Xqk92w.d9SQ6G4G9enJF_xWQ0xN_UkHeso")
+client.run("NzA0OTc1NjQ4NDgwODIxMjQ5.XqqbNA.JiXQ8Lfb8uXNA94cgYBit0DYAss")
