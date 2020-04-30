@@ -14,7 +14,7 @@ def check_group_member(user):
 
     for i in groupdata.keys():
         if user.id in groupdata[i]["members"]:
-            return True, groupdata[i]
+            return True, i
         
     return False, None
 
@@ -22,9 +22,9 @@ def check_group_owner(user):
     with open("groupdata.json", "r") as file:
         groupdata = json.load(file)
 
-    for i in groupdata.keys()
+    for i in groupdata.keys():
         if user.id == groupdata[i]["owner"]:
-            return True, groupdata[i]
+            return True, i
         
     return False, None
 
@@ -381,10 +381,10 @@ async def fight(user, message) -> None:
             continue
 
 async def create_group(user, message) -> None:
-        with open("groupdata.json", "w") as file:
+        with open("groupdata.json", "r") as file:
             groupdata = json.load(file)
 
-        with open("userdata.json", "w") as file:
+        with open("playerdata.json", "r") as file:
             userdata = json.load(file)
 
         split_message = message.content.split( )
@@ -399,13 +399,13 @@ async def create_group(user, message) -> None:
             await message.channel.send("```You dont have enough Retard Bucks to create a group.```")
             return
 
-        does_own_group, tempvar1 = does_own_group(user)
+        does_own_group, tempvar1 = check_group_owner(user)
 
         if does_own_group:
             await message.channel.send("```You already own a group.```")
             return
 
-        is_in_group, tempvar2 = is_in_group(user)
+        is_in_group, tempvar2 = check_group_member(user)
 
         if is_in_group:
             await message.channel.send("```You are already in a group.```")
@@ -427,13 +427,21 @@ async def create_group(user, message) -> None:
             return
 
         #actual creation
-        groupdata[factionname]["owner"] = user
+        groupdata[factionname] = {}
+        groupdata[factionname]["owner"] = user.id
         groupdata[factionname]["members"] = {}
         groupdata[factionname]["money"] = 0
         groupdata[factionname]["inventory"] = {}
 
+        print(groupdata)
+
+        userdata[str(user.id)]["data"]["Money"] -= 250
+
         with open("groupdata.json", "w") as file:
             json.dump(groupdata, file)
+
+        with open("playerdata.json", "w") as file:
+            json.dump(userdata, file)
 
         await message.channel.send(f"````Faction {factionname} has been created.```")
 
@@ -452,21 +460,21 @@ async def invite_group(user, message) -> None:
 
     target = message.mentions[0]
 
-    isingroup, tempvar3 = is_in_group(target)
+    isingroup, tempvar3 = check_group_member(target)
 
     if isingroup:
         await message.channel.send(f"```He is already in a group, bruh.```")
         return
 
-    doesownagroup, tempvar4 = does_own_group(target)
+    doesownagroup, tempvar4 = check_group_owner(target)
 
     if doesownagroup:
         await message.channel.send(f"```He owns a group, bruh.```")
         return
 
-    doesowngroupuser, group_bruh = doesownagroup(user)
+    doesowngroupuser, group_bruh = check_group_owner(user)
 
-    if not doesownagroupuser:
+    if not doesowngroupuser:
         await message.channel.send(f"```You need to own a group to add them.```")
 
 
@@ -481,12 +489,152 @@ async def invite_group(user, message) -> None:
         await message.channel.send(f"```{target.display_name} did not accept the request in time. RIP...```")
         return
 
-    groupdata[group_bruh]["members"][target.id] = "Member"
+
+    groupdata[group_bruh]["members"][str(target.id)] = 1
 
     with open("groupdata.json", "w") as file:
         json.dump(groupdata, file)
     
     await message.channel.send(f"```{target.display_name} has been added to {group_bruh}.```")
+    return
+
+async def leave_group(user, message) -> None:
+    isingroup, groupname = check_group_member(user)
+    if not isingroup:
+        await message.channel.send(f"```You need to be in a group to leave it, retard.```")
+        return
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    del groupdata[groupname]["members"][user.id]
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    await message.channel.send(f"```You succesfully left {groupname}.```")
+
+async def dep_group(user, message) -> None:
+    
+    split_message = message.content.split( )
+    if len(split_message) < 2:
+        await message.channel.send(f"```Please specify an amount to deposit.```")
+        return
+
+    dep_amount = int(split_message[1])
+    
+    with open("playerdata.json", "r") as file:
+        playerdata = json.load(file)
+
+    if dep_amount > playerdata[str(user.id)]["data"]["Money"]:
+        await message.channel.send(f"```You dont have that much money, retard.```")
+        return
+
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+    print(groupname_1)
+    print(groupname_2)
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    groupdata[groupname]["money"] += dep_amount
+
+    playerdata[str(user.id)]["data"]["Money"] -= dep_amount
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    with open("playerdata.json", "w") as file:
+        json.dump(playerdata, file)
+
+    await message.channel.send(f"```You deposited {dep_amount} to group {groupname}!")
+    return
+
+async def disband_group(user, message) -> None:
+    does_own_group, groupname = check_group_owner(user)
+
+    if not does_own_group:
+        await message.channel.send(f"```You dont own a faction, dumbass.```")
+        return
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    def check5(msg):
+        return msg.content == "--accept" and msg.author == user
+
+    await message.channel.send(f"```Are you sure? (do --accept to confirm)```")
+
+    try:
+        msg = await client.wait_for('message', timeout=30.0, check=check5)
+    except asyncio.TimeoutError:
+        await message.channel.send(f"```{user.display_name} Cancelled group disbanding.```")
+        return
+
+    del groupdata[groupname]
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    await message.channel.send(f"```Group {groupname} has been disbanded```")
+    
+async def withdraw_group(user, message) -> None:
+    split_message = message.content.split( )
+    if len(split_message) < 2:
+        await message.channel.send(f"```Please specify an amount to deposit.```")
+        return
+
+    dep_amount = int(split_message[1])
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+    print(groupname_1)
+    print(groupname_2)
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+    
+    with open("playerdata.json", "r") as file:
+        playerdata = json.load(file)
+
+    if dep_amount > groupdata[groupname]["money"]:
+        await message.channel.send(f"```Your Group doesnt have that much, retard.```")
+        return
+
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    groupdata[groupname]["money"] -= dep_amount
+
+    playerdata[str(user.id)]["data"]["Money"] += dep_amount
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    with open("playerdata.json", "w") as file:
+        json.dump(playerdata, file)
+
+    await message.channel.send(f"```You withdrew {dep_amount} from group {groupname}!")
     return
 
 #region Command handler
@@ -536,6 +684,14 @@ async def on_message(message):
             await create_group(message.author, message)
         elif message.content.startswith("?invitegroup"):
             await invite_group(message.author, message)
+        elif message.content.startswith("?leavegroup"):
+            await leave_group(message.author, message)
+        elif message.content.startswith("?depgroup"):
+            await dep_group(message.author, message)
+        elif message.content.startswith("?disband"):
+            await disband_group(message.author, message)
+        elif message.content.startswith("?withdrawgroup"):
+            await withdraw_group(message.author, message)
         else:
             await message.channel.send(f"```Thats not an option, please use ?help```")
 
