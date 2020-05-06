@@ -45,7 +45,8 @@ def register_user(user):
             "Money" : 500,
             "health" : 100,
             "RP" : 100,
-            "fighting" : False
+            "fighting" : False,
+            "last_search" : 00000
         }
         
         new_entry = {
@@ -443,7 +444,7 @@ async def create_group(user, message) -> None:
         with open("playerdata.json", "w") as file:
             json.dump(userdata, file)
 
-        await message.channel.send(f"````Faction {factionname} has been created.```")
+        await message.channel.send(f"```Faction {factionname} has been created.```")
 
 async def invite_group(user, message) -> None:
     with open("groupdata.json", "r") as file:
@@ -559,7 +560,7 @@ async def dep_group(user, message) -> None:
     with open("playerdata.json", "w") as file:
         json.dump(playerdata, file)
 
-    await message.channel.send(f"```You deposited {dep_amount} to group {groupname}!")
+    await message.channel.send(f"```You deposited {dep_amount} to group {groupname}!```")
     return
 
 async def disband_group(user, message) -> None:
@@ -598,6 +599,9 @@ async def withdraw_group(user, message) -> None:
 
     dep_amount = int(split_message[1])
 
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
     if not is_in_group and not does_own_group:
         await message.channel.send(f"```You are not in a group.```")
         return
@@ -621,8 +625,6 @@ async def withdraw_group(user, message) -> None:
         await message.channel.send(f"```Your Group doesnt have that much, retard.```")
         return
 
-    is_in_group, groupname_1 = check_group_member(user)
-    does_own_group, groupname_2 = check_group_owner(user)
 
     groupdata[groupname]["money"] -= dep_amount
 
@@ -634,8 +636,381 @@ async def withdraw_group(user, message) -> None:
     with open("playerdata.json", "w") as file:
         json.dump(playerdata, file)
 
-    await message.channel.send(f"```You withdrew {dep_amount} from group {groupname}!")
+    await message.channel.send(f"```You withdrew {dep_amount} from group {groupname}!```")
     return
+
+async def group_stat(user, message) -> None:
+    global client
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    result_str = ""
+    result_str += f"Group Name: {groupname}\n"
+    result_str += f"Group Owner: {client.get_user(groupdata[groupname]['owner']).display_name}\n"
+    result_str += f"Group Balance: {groupdata[groupname]['money']}\n"
+    result_str += f"do ?groupinv for inventory and ?grouplist for member list."
+
+    await message.channel.send(f"```{result_str}```")
+
+async def group_inv(user, message) -> None:
+
+    channel = message.channel
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    inventory = groupdata[groupname]["inventory"]
+
+    split_message = message.content.split( )
+    pages = len(inventory.keys()) // 5
+    mod = len(inventory.keys()) % 5 
+    if mod > 0:
+        pages += 1
+
+    try:
+        split_message[1] = int(split_message[1])
+        page = split_message[1]
+        if page > pages: 
+            return f"There is only {pages} pages!"
+
+    except:
+        page = 1
+
+    range_min = (page-1) * 5
+    range_max = range_min + 5
+
+    final_items = {}
+    counter = 0
+    for i in inventory.keys():
+        counter += 1
+        if counter < range_max and counter > range_min:
+            final_items[i] = inventory[i]
+
+    message = "Your items: \n\n"
+    for i in final_items.keys():
+        message += f"{i} x{final_items[i]} \n"
+
+    message += f"\nPage {page}/{pages}"
+    
+    await channel.send(f"```{message}```")
+
+async def group_kick(user, message) -> None:
+    isowner, groupname = check_group_owner(user)
+    if not isowner:
+        await message.channel.send(f"```You are not a group owner.```")
+        return  
+
+    if len(message.mentions) > 1:
+        await message.chanel.send(f"```You can only kick one person at a time.```")
+        return
+
+    if len(message.mentions) < 1:
+        await message.channel.send(f"```You need to tag someone to kick.```")
+
+    target = message.mentions[0]
+
+    istargetingroup, targetgroup = check_group_member(target)
+
+    if not  istargetingroup or targetgroup != groupname:
+        await message.channel.send(f"```The person you want to kick is not in your group, retard.```")
+        return
+    
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    del groupdata[groupname]["members"][target.id]
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    await message.channel.send(f"```{target.display_name} has been kicked from {groupname}, that poor guy.```")
+
+async def group_itemdep(user, message) -> None:
+
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    split_message = message.content.split( )
+    if len(split_message) < 2:
+        await message.channel.send(f"```You need to specify an item to deposit.```")
+        return
+    elif len(split_message) < 3:
+        dep_amount = 1
+    elif len(split_message) < 4:
+        dep_amount = split_message[2]
+    dep_item = split_message[1]
+
+    with open("playerdata.json", "r") as file:
+        playerdata = json.load(file)
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    if not dep_item in playerdata[str(user.id)]["data"]["inventory"]:
+        await message.channel.send(f"```You dont have that item.```")
+        return
+
+    if playerdata[str(user.id)]["data"]["inventory"][dep_item] < dep_amount:
+        await message.channel.send(f"```You dont have that many of that item.```")
+        return
+
+    if dep_item in groupdata[groupname]["inventory"]:
+        groupdata[groupname]["inventory"][dep_item] += dep_amount
+    else:
+        groupdata[groupname]["inventory"][dep_item] = dep_amount
+
+    if playerdata[str(user.id)]["data"]["inventory"][dep_item] == dep_amount:
+        del playerdata[str(user.id)]["data"]["inventory"][dep_item]
+    else:
+        playerdata[str(user.id)]["data"]["inventory"][dep_item] -= dep_amount
+
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    await message.channel.send(f"```You deposited {dep_amount} {dep_item}(s) to your group.```")
+    return
+
+async def group_itemwithdraw(user, message) -> None:
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+    split_message = message.content.split( )
+    if len(split_message) < 2:
+        await message.channel.send(f"```You need to specify an item to deposit.```")
+        return
+    elif len(split_message) < 3:
+        dep_amount = 1
+    elif len(split_message) < 4:
+        dep_amount = split_message[2]
+    dep_item = split_message[1]
+
+    with open("playerdata.json", "r") as file:
+        playerdata = json.load(file)
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+
+    if not dep_item in groupdata[groupname]["inventory"]:
+        await message.channel.send(f"```Your group doesent have that item.```")
+        return
+
+    if groupdata[groupname]["inventory"][dep_item] < dep_amount:
+        await message.channel.send(f"```Your group doesent have that many of that item.```")
+        return
+
+    
+    if dep_item in playerdata[str(user.id)]["data"]["inventory"]:
+        playerdata[str(user.id)]["data"]["inventory"][dep_item] += dep_amount
+    else:
+        playerdata[str(user.id)]["data"]["inventory"][dep_item] = dep_amount
+
+    if groupdata[groupname]["inventory"][dep_item] == dep_amount:
+        del groupdata[groupname]["inventory"][dep_item]
+    else:
+        groupdata[groupname]["inventory"][dep_item] -= dep_amount
+
+
+
+    with open("groupdata.json", "w") as file:
+        json.dump(groupdata, file)
+
+    await message.channel.send(f"```You deposited {dep_amount} {dep_item}(s) to your group.```")
+    return
+
+async def grouplist(user, message) -> None:
+
+    channel = message.channel
+
+    with open("groupdata.json", "r") as file:
+        groupdata = json.load(file)
+    
+    is_in_group, groupname_1 = check_group_member(user)
+    does_own_group, groupname_2 = check_group_owner(user)
+
+    if not is_in_group and not does_own_group:
+        await message.channel.send(f"```You are not in a group.```")
+        return
+    
+    print(groupname_1)
+    print(groupname_2)
+
+    if is_in_group:
+        groupname = groupname_1
+
+    elif does_own_group:
+        groupname = groupname_2
+
+
+    inventory = groupdata[groupname]["members"]
+    split_message = message.content.split( )
+    pages = len(inventory.keys()) // 5
+    mod = len(inventory.keys()) % 5 
+    if mod > 0:
+        pages += 1
+
+    try:
+        split_message[1] = int(split_message[1])
+        page = split_message[1]
+        if page > pages: 
+            return f"There is only {pages} pages!"
+
+    except:
+        page = 1
+
+    range_min = (page-1) * 5
+    range_max = range_min + 5
+
+    final_items = {}
+    counter = 0
+    for i in inventory.keys():
+        counter += 1
+        if counter < range_max and counter > range_min:
+            final_items[i] = inventory[i]
+
+    message = f"{groupname} Members: \n\n"
+    for i in final_items.keys():
+        message += f"{i} \n"
+
+    message += f"\nPage {page}/{pages}"
+    await channel.send(f"```{message}```")
+
+async def sell_itme(user, message) -> None:
+    split_message = message.content.split( )
+    if len(split_message) < 2:
+        await message.channel.send("```You need to specify name and amount of items you want to sell.```")
+        return
+    elif len(split_message) < 3:
+        buy_amount = 1
+    elif len(split_message) < 4:
+        buy_amount = split_message[2]
+        
+    buy_item = split_message[1]
+
+    with open("shopitems.json", "r") as file:
+        shopdata = json.load(file)
+        
+    with open("playerdata.json", "r") as file:
+        userdata = json.load(file)
+
+    total_price = (shopdata[buy_item] * int(buy_amount)) / 2
+
+    print("total price:")
+    print(total_price)
+
+    if not buy_item in userdata["data"]["inventory"].keys():
+        await message.channel.send("```You don't have the item you want to sell, retard.```")
+        return
+
+    if userdata["data"]["inventory"][buy_item] < buy_amount:
+        await message.channel.send("```You dont have that many, retard.```")
+        return
+    
+    userdata[str(user.id)]["data"]["Money"] = userdata[str(user.id)]["data"]["Money"] + total_price
+
+
+    userdata[str(user.id)]["data"]["inventory"][str(buy_item)] -= int(buy_amount)
+
+
+    with open("playerdata.json", "w") as file:
+        json.dump(userdata, file)
+
+    await message.channel.send(f"You sold {buy_amount} {buy_item}(s).")
+
+async def search(user, message) -> None:
+    with open("playerdata.json", "r") as file:
+        playerdata = json.load(file)
+
+    if time.time() - 600 > playerdata[str(user.id)]["data"]["last_search"]:
+        await message.channel.send("```You need to wait 10 minutes between parameter searches!```")
+        return
+
+    #real randomization begins
+
+    #how much money will he get? (between 0 and 100)
+    found_money = random.randint(0, 100)
+
+    #will he get a item? (0-100, 0-50 means no, 50-100 has items assigned.)
+    item_rand = random.randit(0, 100)
+
+    if item_rand > 50:
+        if item_rand > 50 and item_rand <= 70:
+            item_get = "bread"
+        elif item_get > 70 and item_rand <= 80:
+            item_get = "glock"
+        elif item_get > 80 and item_rand <= 90:
+            item_get = "adrenaline"
+        elif item_get > 90 and item_rand <= 100:
+            item_get = "m4"
+    else:
+        item_get = False
+
+    if not item_get == False:
+        await message.channel.send(f"```You found {found_money} Retard Bucks and a {item_get} while searching the parameter!```")
+        playerdata[str(user.id)]["data"]["Money"] += found_money
+        if item_get in playerdata[str(user.id)]["data"]["inventory"].keys():
+            playerdata[str(user.id)]["data"]["inventory"][item_get] += 1
+        else:
+            playerdata[str(user.id)]["data"]["inventory"][item_get] = 1
+    
+    if item_get == False
+        await message.channel.send(f"```You found {found_money} Retard Bucks while searching the perimeter!```")
+        playerdata[str(user.id)]["data"]["Money"] += found_money
+
+    playerdata[str(user.id)]["data"]["last_search"] = time.time()
+
+    with open("playerdata", "w") as file:
+        json.dump(playerdata, file)
 
 #region Command handler
 @client.event
@@ -692,6 +1067,20 @@ async def on_message(message):
             await disband_group(message.author, message)
         elif message.content.startswith("?withdrawgroup"):
             await withdraw_group(message.author, message)
+        elif message.content.startswith("?groupstat"):
+            await group_stat(message.author, message)
+        elif message.content.startswith("?groupinv"):
+            await group_inv(message.author, message)
+        elif message.content.startswith("?group_itemdep"):
+            await group_itemdep(message.author, message)
+        elif message.content.startswith("?group_itemwithdraw"):
+            await group_itemwithdraw(message.author, message)
+        elif message.content.startswith("?grouplist"):
+            await grouplist(message.author, message)
+        elif message.content.startswith("?sell"):
+            await sell_itme(message.author, message)
+        elif message.content.startswith("?search")
+            await search(message.author, message)
         else:
             await message.channel.send(f"```Thats not an option, please use ?help```")
 
