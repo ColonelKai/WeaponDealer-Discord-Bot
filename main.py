@@ -108,7 +108,7 @@ def inventory_read(user, message):
     counter = 0
     for i in inventory.keys():
         counter += 1
-        if counter < range_max and counter > range_min:
+        if counter <= range_max and counter > range_min:
             final_items[i] = inventory[i]
 
     message = "Your items: \n\n"
@@ -148,7 +148,7 @@ def shop_read(user, message):
     counter = 0
     for i in inventory.keys():
         counter += 1
-        if counter < range_max and counter > range_min:
+        if counter <= range_max and counter > range_min:
             final_items[i] = inventory[i]
 
     message = "Shop: \n\n"
@@ -239,7 +239,7 @@ def use_item(user, message):
             userdata[str(user.id)]["data"]["inventory"][item] -= 1
         with open("playerdata.json", "w") as file:
             json.dump(userdata, file)
-        return "You ate a bread and gained 5 health!"
+        return "You ate used an adrenaline and got 20 health!"
     
 def kill_someone(user):
     with open("playerdata.json", "r") as file:
@@ -711,7 +711,7 @@ async def group_inv(user, message) -> None:
     counter = 0
     for i in inventory.keys():
         counter += 1
-        if counter < range_max and counter > range_min:
+        if counter <= range_max and counter > range_min:
             final_items[i] = inventory[i]
 
     message = "Your items: \n\n"
@@ -915,7 +915,7 @@ async def grouplist(user, message) -> None:
     counter = 0
     for i in inventory.keys():
         counter += 1
-        if counter < range_max and counter > range_min:
+        if counter <= range_max and counter > range_min:
             final_items[i] = inventory[i]
 
     message = f"{groupname} Members: \n\n"
@@ -971,7 +971,7 @@ async def search(user, message) -> None:
     with open("playerdata.json", "r") as file:
         playerdata = json.load(file)
 
-    if time.time() - 600 > playerdata[str(user.id)]["data"]["last_search"]:
+    if time.time() - 600 < playerdata[str(user.id)]["data"]["last_search"]:
         await message.channel.send("```You need to wait 10 minutes between parameter searches!```")
         return
 
@@ -981,16 +981,16 @@ async def search(user, message) -> None:
     found_money = random.randint(0, 100)
 
     #will he get a item? (0-100, 0-50 means no, 50-100 has items assigned.)
-    item_rand = random.randit(0, 100)
+    item_rand = random.randint(0, 100)
 
     if item_rand > 50:
         if item_rand > 50 and item_rand <= 70:
             item_get = "bread"
-        elif item_get > 70 and item_rand <= 80:
+        elif item_rand > 70 and item_rand <= 80:
             item_get = "glock"
-        elif item_get > 80 and item_rand <= 90:
+        elif item_rand > 80 and item_rand <= 90:
             item_get = "adrenaline"
-        elif item_get > 90 and item_rand <= 100:
+        elif item_rand > 90 and item_rand <= 100:
             item_get = "m4"
     else:
         item_get = False
@@ -1003,13 +1003,13 @@ async def search(user, message) -> None:
         else:
             playerdata[str(user.id)]["data"]["inventory"][item_get] = 1
     
-    if item_get == False
+    if item_get == False:
         await message.channel.send(f"```You found {found_money} Retard Bucks while searching the perimeter!```")
         playerdata[str(user.id)]["data"]["Money"] += found_money
 
     playerdata[str(user.id)]["data"]["last_search"] = time.time()
 
-    with open("playerdata", "w") as file:
+    with open("playerdata.json", "w") as file:
         json.dump(playerdata, file)
 
 #region Command handler
@@ -1079,11 +1079,11 @@ async def on_message(message):
             await grouplist(message.author, message)
         elif message.content.startswith("?sell"):
             await sell_itme(message.author, message)
-        elif message.content.startswith("?search")
+        elif message.content.startswith("?search"):
             await search(message.author, message)
         else:
             await message.channel.send(f"```Thats not an option, please use ?help```")
 
 #endregion
 
-client.run("YOUR TOKEN HERE")
+client.run("NzA0OTc1NjQ4NDgwODIxMjQ5.Xqq4Eg.qbe5rQOsqnZUeDqsq9Q8YLEqysU")
