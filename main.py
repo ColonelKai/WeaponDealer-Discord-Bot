@@ -13,7 +13,7 @@ def check_group_member(user):
         groupdata = json.load(file)
 
     for i in groupdata.keys():
-        if user.id in groupdata[i]["members"]:
+        if str(user.id) in groupdata[i]["members"].keys():
             return True, i
         
     return False, None
@@ -807,6 +807,9 @@ async def group_itemdep(user, message) -> None:
     with open("groupdata.json", "w") as file:
         json.dump(groupdata, file)
 
+    with open("playerdata.json", "w") as file:
+        json.dump(playerdata, file)
+
     await message.channel.send(f"```You deposited {dep_amount} {dep_item}(s) to your group.```")
     return
 
@@ -916,7 +919,7 @@ async def grouplist(user, message) -> None:
     for i in inventory.keys():
         counter += 1
         if counter <= range_max and counter > range_min:
-            final_items[i] = inventory[i]
+            final_items[i] = client.get_user(int(i)).display_name
 
     message = f"{groupname} Members: \n\n"
     for i in final_items.keys():
@@ -933,7 +936,7 @@ async def sell_itme(user, message) -> None:
     elif len(split_message) < 3:
         buy_amount = 1
     elif len(split_message) < 4:
-        buy_amount = split_message[2]
+        buy_amount = int(split_message[2])
         
     buy_item = split_message[1]
 
@@ -948,11 +951,11 @@ async def sell_itme(user, message) -> None:
     print("total price:")
     print(total_price)
 
-    if not buy_item in userdata["data"]["inventory"].keys():
+    if not buy_item in userdata[str(user.id)]["data"]["inventory"].keys():
         await message.channel.send("```You don't have the item you want to sell, retard.```")
         return
 
-    if userdata["data"]["inventory"][buy_item] < buy_amount:
+    if userdata[str(user.id)]["data"]["inventory"][buy_item] < buy_amount:
         await message.channel.send("```You dont have that many, retard.```")
         return
     
@@ -1086,4 +1089,4 @@ async def on_message(message):
 
 #endregion
 
-client.run("NzA0OTc1NjQ4NDgwODIxMjQ5.Xqq4Eg.qbe5rQOsqnZUeDqsq9Q8YLEqysU")
+client.run("YOUR TOKEN HERE")
